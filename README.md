@@ -12,6 +12,7 @@ Appli web installable (PWA), qui marche **hors ligne** une fois installée. Tout
 - À la fin : l'écran clignote, l'alarme sonne et le téléphone vibre. On touche pour arrêter, on retouche pour lancer la pièce suivante.
 - « Fini ! » pour passer à la suite en avance, « Passer » pour sauter une pièce, « Pause », « Tout arrêter ».
 - Stats par personne et pour la famille : série de jours, minutes, pièces, calendrier, courbes, classement de la semaine, niveaux, étoiles et badges.
+- Synchro optionnelle entre téléphones via un dépôt GitHub privé (`tidytime-sauvegardes`) et une clé limitée à ce dépôt, configurée dans Réglages (même principe que livre-hero).
 - Export / import d'une sauvegarde JSON.
 
 ## Installer sur le téléphone

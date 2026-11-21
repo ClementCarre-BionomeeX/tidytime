@@ -123,6 +123,9 @@ h2{font-size:20px;margin:20px 0 10px}
 .board li{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
 .board li:last-child{border:0}
 .board .medal{width:28px;text-align:center;font-size:20px}
+.step3{border-left:4px solid var(--accent);padding:4px 0 4px 12px;margin:12px 0}
+.notice{padding:10px 12px;border-radius:12px;background:var(--bg);margin:8px 0;font-size:14px}
+.notice.bad{background:#e5484d22;color:var(--warn)}
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;z-index:40;opacity:0;transition:opacity .3s;pointer-events:none}
 .toast.on{opacity:1}
 
@@ -186,6 +189,8 @@ h2{font-size:20px;margin:20px 0 10px}
         <select id="setTheme"><option value="">Automatique</option><option value="light">Clair</option><option value="dark">Sombre</option></select>
       </label>
     </div>
+    <h2>Synchro GitHub</h2>
+    <div class="card" id="syncCard"></div>
     <h2>Sauvegarde</h2>
     <div class="card">
       <p class="small muted" style="margin-top:0">Tout est enregistré sur ce téléphone uniquement. Exporte de temps en temps pour ne pas perdre les stats.</p>
@@ -235,7 +240,7 @@ h2{font-size:20px;margin:20px 0 10px}
 <script>
 (() => {
 'use strict';
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const KEY = 'tidytime-v1';
 const PHOTO = id => 'tidytime-photo-' + id;
 const $ = s => document.querySelector(s);
@@ -266,9 +271,9 @@ function load() {
   try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
   if (!S || !Array.isArray(S.rooms)) S = defaults();
   S.settings = Object.assign(defaults().settings, S.settings || {});
-  S.sessions = S.sessions || []; S.people = S.people || []; S.lastWho = S.lastWho || [];
+  S.sessions = S.sessions || []; S.people = S.people || []; S.lastWho = S.lastWho || []; S.tombs = S.tombs || {}; S.configAt = S.configAt || 0;
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Impossible d\'enregistrer (mémoire pleine ?)'); } }
+function save(what) { if (what === 'config') S.configAt = Date.now(); if (what) { Sync.touch(); clearTimeout(save.t); save.t = setTimeout(() => { if (!R) Sync.run(true); }, 3000); } try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Impossible d\'enregistrer (mémoire pleine ?)'); } }
 function getPhoto(id) { try { return localStorage.getItem(PHOTO(id)); } catch (e) { return null; } }
 function setPhoto(id, data) { try { data ? localStorage.setItem(PHOTO(id), data) : localStorage.removeItem(PHOTO(id)); return true; } catch (e) { toast('Photo trop lourde pour la mémoire'); return false; } }
 
@@ -497,7 +502,7 @@ function endRun(stopped) {
   const sess = { id: R.id, start: R.start, end: Date.now(), people: R.people, stopped, rooms: R.rooms.map(({ id, name, emoji, planned, spent, status }) => ({ id, name, emoji, planned, spent, status })) };
   const any = sess.rooms.some(x => x.status !== 'skipped' && x.spent > 0);
   const before = Object.fromEntries(S.people.map(p => [p.id, level(sessionsFor(p.id).reduce((a, s) => a + sessionPoints(s), 0)).n]));
-  if (any) { S.sessions.push(sess); save(); }
+  if (any) { S.sessions.push(sess); save('session'); Sync.run(true); }
   R = null;
   $('#run').classList.remove('on', 'ringing'); document.body.classList.remove('hidebar');
   if (history.state && history.state.run) history.back();
@@ -596,14 +601,14 @@ function editRoom(room) {
         el('label', { class: 'btn small' }, '📷 Choisir', file),
         el('button', { class: 'btn small ghost', onclick: () => { photo = null; photoChanged = true; paintPrev(); } }, 'Retirer'))),
     el('div', { class: 'row', style: 'margin-top:16px' },
-      !isNew ? el('button', { class: 'btn ghost', style: 'color:var(--warn)', onclick: () => { S.rooms = S.rooms.filter(x => x.id !== r.id); setPhoto(r.id, null); save(); closeSheet($('#editModal')); renderRooms(); } }, 'Supprimer') : null,
+      !isNew ? el('button', { class: 'btn ghost', style: 'color:var(--warn)', onclick: () => { S.rooms = S.rooms.filter(x => x.id !== r.id); setPhoto(r.id, null); save('config'); closeSheet($('#editModal')); renderRooms(); } }, 'Supprimer') : null,
       el('span', { class: 'grow' }),
       el('button', { class: 'btn ghost', onclick: () => closeSheet($('#editModal')) }, 'Annuler'),
       el('button', { class: 'btn green', onclick: () => {
         r.name = name.value.trim() || 'Pièce'; r.minutes = Math.max(1, Math.min(60, parseInt(mins.value, 10) || 5));
         if (photoChanged) setPhoto(r.id, photo);
         if (isNew) S.rooms.push(r); else S.rooms[S.rooms.findIndex(x => x.id === r.id)] = r;
-        save(); closeSheet($('#editModal')); renderRooms();
+        save('config'); closeSheet($('#editModal')); renderRooms();
       } }, 'Enregistrer')),
   ]);
   if (isNew) setTimeout(() => name.focus(), 50);
@@ -624,13 +629,13 @@ function editPerson(person) {
     el('div', { class: 'field' }, el('span', {}, 'Avatar'), pickers('emoji', p.emoji, v => p.emoji = v, PERSON_EMOJIS)),
     el('div', { class: 'field' }, el('span', {}, 'Couleur'), pickers('color', p.color, v => p.color = v, COLORS)),
     el('div', { class: 'row', style: 'margin-top:16px' },
-      !isNew ? el('button', { class: 'btn ghost', style: 'color:var(--warn)', onclick: () => { if (S.people.length <= 1) { toast('Il faut au moins une personne'); return; } S.people = S.people.filter(x => x.id !== p.id); save(); closeSheet($('#editModal')); renderRooms(); } }, 'Supprimer') : null,
+      !isNew ? el('button', { class: 'btn ghost', style: 'color:var(--warn)', onclick: () => { if (S.people.length <= 1) { toast('Il faut au moins une personne'); return; } S.people = S.people.filter(x => x.id !== p.id); save('config'); closeSheet($('#editModal')); renderRooms(); } }, 'Supprimer') : null,
       el('span', { class: 'grow' }),
       el('button', { class: 'btn ghost', onclick: () => closeSheet($('#editModal')) }, 'Annuler'),
       el('button', { class: 'btn green', onclick: () => {
         p.name = name.value.trim() || 'Sans nom';
         if (isNew) { S.people.push(p); S.lastWho.push(p.id); } else S.people[S.people.findIndex(x => x.id === p.id)] = p;
-        save(); closeSheet($('#editModal')); document.querySelector('#home.on') ? renderHome() : renderRooms();
+        save('config'); closeSheet($('#editModal')); document.querySelector('#home.on') ? renderHome() : renderRooms();
       } }, 'Enregistrer')),
   ]);
   if (isNew) setTimeout(() => name.focus(), 50);
@@ -640,7 +645,7 @@ function editPerson(person) {
 function renderRooms() {
   const ul = $('#roomEdit'); ul.innerHTML = '';
   S.rooms.forEach((r, i) => {
-    const mv = (d) => { const j = i + d; if (j < 0 || j >= S.rooms.length) return; [S.rooms[i], S.rooms[j]] = [S.rooms[j], S.rooms[i]]; save(); renderRooms(); };
+    const mv = (d) => { const j = i + d; if (j < 0 || j >= S.rooms.length) return; [S.rooms[i], S.rooms[j]] = [S.rooms[j], S.rooms[i]]; save('config'); renderRooms(); };
     ul.append(el('li', {},
       roomDot(r),
       el('button', { class: 'grow', style: 'text-align:left', onclick: () => editRoom(r) }, el('b', {}, `${i + 1}. ${r.name}`), el('div', { class: 'muted small' }, `${r.minutes} min · toucher pour modifier`)),
@@ -755,6 +760,7 @@ function recentList(list) {
 
 /* ------------------------- SETTINGS ------------------------- */
 function renderSettings() {
+  renderSync();
   $('#setDefault').value = S.settings.defaultMin; $('#setSound').value = S.settings.sound; $('#setVol').value = S.settings.volume;
   $('#setVib').checked = S.settings.vibrate; $('#setTick').checked = S.settings.tick; $('#setTheme').value = S.settings.theme;
   $('#version').textContent = 'TidyTime v' + VERSION + (navigator.serviceWorker && navigator.serviceWorker.controller ? ' · disponible hors ligne ✓' : '');
@@ -783,7 +789,7 @@ $('#resetStats').addEventListener('click', () => {
     el('h2', { style: 'margin-top:0' }, 'Effacer toutes les stats ?'),
     el('p', { class: 'muted' }, 'Les pièces et les personnes sont gardées. Cette action est définitive.'),
     el('div', { class: 'row' }, el('button', { class: 'btn grow', onclick: () => closeSheet($('#editModal')) }, 'Annuler'),
-      el('button', { class: 'btn grow', style: 'background:var(--warn);color:#fff', onclick: () => { S.sessions = []; save(); closeSheet($('#editModal')); toast('Stats effacées'); } }, 'Effacer')),
+      el('button', { class: 'btn grow', style: 'background:var(--warn);color:#fff', onclick: () => { S.tombs = S.tombs || {}; S.sessions.forEach(x => { S.tombs[x.id] = Date.now(); }); S.sessions = []; save('session'); Sync.run(true); closeSheet($('#editModal')); toast('Stats effacées'); } }, 'Effacer')),
   ]);
 });
 
@@ -796,8 +802,152 @@ function confetti() {
   requestAnimationFrame(f);
 }
 
+
+/* ------------------------- SYNC (private GitHub repo) ------------------------- */
+// Same principle as livre-hero: one JSON file in a private repo, a fine-grained key limited to that repo,
+// kept in this browser only. Sessions merge by id (deletions travel as tombstones); rooms and people:
+// the most recently edited list wins.
+const SYNC_REPO = 'tidytime-sauvegardes', SYNC_FILE = 'sauvegarde.json', SYNC_API = 'https://api.github.com', SYNC_KEY = 'tidytime-sync';
+const SYNC_NEW_REPO = 'https://github.com/new?name=' + SYNC_REPO + '&visibility=private&description=' + encodeURIComponent('Sauvegardes de TidyTime (stats de rangement)');
+const SYNC_NEW_KEY = 'https://github.com/settings/personal-access-tokens/new?name=' + encodeURIComponent('TidyTime sauvegardes') + '&description=' + encodeURIComponent('Lit et écrit le fichier de sauvegarde de TidyTime dans ' + SYNC_REPO + '.') + '&expires_in=none&contents=write';
+const Sync = (() => {
+  const Y = { busy: false, dirty: false, error: '' }; let again = false, draft = { token: '', err: '', busy: false };
+  Y.config = () => { try { return JSON.parse(localStorage.getItem(SYNC_KEY)); } catch (e) { return null; } };
+  const setCfg = c => { try { localStorage.setItem(SYNC_KEY, JSON.stringify(c)); } catch (e) {} };
+  Y.on = () => { const c = Y.config(); return !!(c && c.token && c.repo); };
+  Y.touch = () => { Y.dirty = true; };
+  const api = (c, method, path, body, accept) => fetch(SYNC_API + path, { method, cache: 'no-store', headers: { Authorization: 'Bearer ' + c.token, Accept: accept || 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const b64 = str => { const by = new TextEncoder().encode(str); let out = ''; for (let i = 0; i < by.length; i += 0x8000) out += String.fromCharCode.apply(null, by.subarray(i, i + 0x8000)); return btoa(out); };
+  const unb64 = s => { const bin = atob(s.replace(/\s/g, '')); const by = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) by[i] = bin.charCodeAt(i); return new TextDecoder().decode(by); };
+  const why = r => r.status === 401 ? 'la clé n\'est plus valable (expirée ou supprimée), refais la configuration'
+    : r.status === 403 ? 'la clé n\'a pas le droit d\'écrire (permission « Contents » en lecture et écriture)'
+    : r.status === 404 ? 'le dossier ' + SYNC_REPO + ' est introuvable pour cette clé' : 'GitHub a répondu ' + r.status;
+  Y.connect = async token => {
+    const c = { token: token.trim() };
+    let r = await api(c, 'GET', '/user/repos?per_page=100&sort=updated');
+    if (r.status === 401) throw new Error('GitHub ne reconnaît pas cette clé, vérifie qu\'elle est copiée en entier');
+    let repos = r.ok ? await r.json() : [];
+    if (!repos.length) { const u = await api(c, 'GET', '/user'); if (!u.ok) throw new Error(why(u)); const me = await u.json(); const x = await api(c, 'GET', '/repos/' + me.login + '/' + SYNC_REPO); repos = x.ok ? [await x.json()] : []; }
+    const repo = repos.find(x => x.name === SYNC_REPO) || (repos.length === 1 ? repos[0] : null);
+    if (!repo) throw new Error(repos.length ? 'cette clé ouvre plusieurs dossiers et aucun ne s\'appelle ' + SYNC_REPO : 'cette clé n\'ouvre aucun dossier : à l\'étape 2, choisis « Only select repositories » puis ' + SYNC_REPO);
+    if (!repo.private) throw new Error('le dossier ' + repo.full_name + ' est public : rends-le privé avant d\'y mettre les stats des enfants');
+    if (repo.permissions && !repo.permissions.push) throw new Error('la clé ne peut que lire ' + repo.full_name + ' : donne-lui « Contents : Read and write »');
+    c.owner = repo.owner.login; c.repo = repo.name; c.since = Date.now(); setCfg(c); return c;
+  };
+  Y.disconnect = () => { try { localStorage.removeItem(SYNC_KEY); } catch (e) {} Y.error = ''; renderSync(); };
+  async function pull(c) {
+    const path = '/repos/' + c.owner + '/' + c.repo + '/contents/' + SYNC_FILE;
+    const r = await api(c, 'GET', path);
+    if (r.status === 404) return { sha: null, data: null };
+    if (!r.ok) throw new Error(why(r));
+    const meta = await r.json();
+    if (meta.content && meta.encoding === 'base64') return { sha: meta.sha, data: JSON.parse(unb64(meta.content)) };
+    const r2 = await api(c, 'GET', path, null, 'application/vnd.github.raw+json'); if (!r2.ok) throw new Error(why(r2));
+    return { sha: meta.sha, data: JSON.parse(await r2.text()) };
+  }
+  async function push(c, sha, data) {
+    const body = { message: 'Sauvegarde du ' + new Date().toLocaleString('fr-FR'), content: b64(JSON.stringify(data)) };
+    if (sha) body.sha = sha;
+    const r = await api(c, 'PUT', '/repos/' + c.owner + '/' + c.repo + '/contents/' + SYNC_FILE, body);
+    if (r.status === 409 || r.status === 422) return 'conflict';
+    if (!r.ok) throw new Error(why(r)); return 'ok';
+  }
+  const mine = () => ({ app: 'tidytime', format: 1, configAt: S.configAt || 0, rooms: S.rooms, people: S.people, sessions: S.sessions, tombs: S.tombs || {} });
+  // Merge the shared file into this device; returns { changedHere, needPush }.
+  function merge(rd) {
+    const old = Date.now() - 365 * 864e5; const tombs = {};
+    [S.tombs || {}, rd.tombs || {}].forEach(t => Object.keys(t).forEach(k => { if (t[k] > old && (!tombs[k] || tombs[k] < t[k])) tombs[k] = t[k]; }));
+    const byId = {}; (rd.sessions || []).forEach(x => { if (x && x.id) byId[x.id] = x; });
+    const localIds = new Set(S.sessions.map(x => x.id));
+    let changedHere = false, needPush = false;
+    const before = S.sessions.length; S.sessions = S.sessions.filter(x => !tombs[x.id]); if (S.sessions.length !== before) changedHere = true;
+    Object.values(byId).forEach(x => { if (!tombs[x.id] && !localIds.has(x.id)) { S.sessions.push(x); changedHere = true; } });
+    S.sessions.sort((a, b) => a.start - b.start);
+    if (S.sessions.some(x => !byId[x.id])) needPush = true;
+    if (Object.keys(tombs).some(k => !(rd.tombs || {})[k])) needPush = true;
+    if ((rd.configAt || 0) > (S.configAt || 0) && Array.isArray(rd.rooms)) { S.rooms = rd.rooms; S.people = rd.people || S.people; S.configAt = rd.configAt; changedHere = true; }
+    else if ((S.configAt || 0) > (rd.configAt || 0)) needPush = true;
+    S.tombs = tombs;
+    return { changedHere, needPush };
+  }
+  Y.run = async (quiet) => {
+    if (!Y.on()) return;
+    if (Y.busy) { again = true; return; }
+    const c = Y.config(); Y.busy = true; Y.dirty = false; renderSync();
+    try {
+      for (let tries = 0; ; tries++) {
+        const remote = await pull(c);
+        const rd = remote.data && remote.data.app === 'tidytime' ? remote.data : null;
+        let res = { changedHere: false, needPush: true };
+        if (rd) res = merge(rd);
+        if (res.changedHere) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} refreshScreen(); }
+        if (!res.needPush) break;
+        const st = await push(c, remote.sha, mine());
+        if (st === 'ok') break;
+        if (tries >= 2) throw new Error('un autre téléphone écrivait en même temps, ce sera pour la prochaine fois');
+      }
+      Y.error = ''; c.last = Date.now(); setCfg(c);
+    } catch (e) {
+      Y.error = String((e && e.message) || e);
+      if (/Failed to fetch|NetworkError|Load failed/.test(Y.error)) Y.error = 'pas de réseau, ce sera pour la prochaine fois';
+      if (!quiet) toast('Synchro : ' + Y.error);
+    }
+    Y.busy = false; renderSync();
+    if (again) { again = false; return Y.run(true); }
+  };
+  let started = false;
+  Y.start = () => {
+    if (!Y.on()) return; Y.run(true);
+    if (started) return; started = true;
+    setInterval(() => { if (Y.dirty && Y.on() && !R) Y.run(true); }, 60000);
+    document.addEventListener('visibilitychange', () => { if (!Y.on()) return; if (document.hidden) { if (Y.dirty) Y.run(true); } else if (!R) Y.run(true); });
+    addEventListener('online', () => Y.run(true));
+  };
+  // Link to set up another phone: opens the app with #sync=… and this device is plugged in.
+  Y.link = () => { const c = Y.config(); return location.origin + location.pathname + '#sync=' + b64(JSON.stringify({ t: c.token, o: c.owner, r: c.repo })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+  Y.fromLink = () => {
+    const m = /^#sync=([A-Za-z0-9_-]+)/.exec(location.hash || ''); if (!m) return false;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { location.hash = ''; }
+    try { const c = JSON.parse(unb64(m[1].replace(/-/g, '+').replace(/_/g, '/'))); if (!c.t || !c.o || !c.r) return false; setCfg({ token: c.t, owner: c.o, repo: c.r, since: Date.now() }); toast('Téléphone branché sur la synchro ✓'); return true; } catch (e) { return false; }
+  };
+  Y.draft = draft;
+  return Y;
+})();
+function refreshScreen() { if (R) return; const on = document.querySelector('.screen.on'); if (on) ({ home: renderHome, rooms: renderRooms, stats: renderStats, settings: renderSettings })[on.id](); }
+const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'à l\'instant' : m < 60 ? 'il y a ' + m + ' min' : new Date(t).toLocaleString('fr-FR', { weekday: 'short', hour: '2-digit', minute: '2-digit' }); };
+function renderSync() {
+  const box = $('#syncCard'); if (!box || !$('#settings').classList.contains('on')) return;
+  box.innerHTML = ''; const c = Sync.config(); const d = Sync.draft;
+  if (Sync.on()) {
+    box.append(el('div', { class: 'notice' }, '✔ Branché sur le dossier privé ', el('b', {}, c.owner + '/' + c.repo), '. ', Sync.busy ? 'Synchronisation…' : c.last ? 'Dernière synchro ' + ago(c.last) + '.' : ''));
+    if (Sync.error) box.append(el('div', { class: 'notice bad' }, 'La dernière synchro n\'a pas abouti : ' + Sync.error + '.'));
+    box.append(el('p', { class: 'small muted' }, 'Les rangements, les pièces et les personnes se retrouvent sur chaque téléphone branché : à l\'ouverture, après chaque rangement et à chaque modification. Les photos des pièces et les réglages restent sur chaque téléphone.'));
+    box.append(el('div', { class: 'row', style: 'flex-wrap:wrap' },
+      el('button', { class: 'btn small green', disabled: Sync.busy ? '' : false, onclick: () => Sync.run() }, '🔄 Synchroniser'),
+      el('button', { class: 'btn small', onclick: async () => { const url = Sync.link(); try { if (navigator.share) await navigator.share({ title: 'TidyTime', text: 'Ouvre ce lien sur l\'autre téléphone pour le brancher sur la synchro TidyTime', url }); else { await navigator.clipboard.writeText(url); toast('Lien copié'); } } catch (e) {} } }, '📱 Brancher un autre téléphone')));
+    box.append(el('p', { class: 'small muted' }, 'Ce lien contient la clé : ne l\'envoie qu\'à toi-même.'));
+    box.append(el('button', { class: 'btn small ghost', onclick: () => Sync.disconnect() }, 'Débrancher ce téléphone'));
+    return;
+  }
+  box.append(el('p', { class: 'small', style: 'margin-top:0' }, 'Garde les stats dans un dossier privé sur GitHub, partagé entre tes téléphones. Trois étapes, une seule fois.'));
+  box.append(el('div', { class: 'step3' }, el('b', {}, '1. Créer le dossier privé'), el('p', { class: 'small muted' }, 'Le lien ouvre GitHub avec tout rempli (« ' + SYNC_REPO + ' », privé). Clique « Create repository ».'), el('a', { class: 'btn small', href: SYNC_NEW_REPO, target: '_blank', rel: 'noopener' }, 'Créer le dossier ↗')));
+  box.append(el('div', { class: 'step3' }, el('b', {}, '2. Créer la clé'), el('p', { class: 'small muted' }, 'Page déjà remplie. Dans « Repository access », choisis « Only select repositories » puis « ' + SYNC_REPO + ' ». Clique « Generate token » et copie la clé (github_pat_…).'), el('a', { class: 'btn small', href: SYNC_NEW_KEY, target: '_blank', rel: 'noopener' }, 'Créer la clé ↗')));
+  const inp = el('input', { type: 'password', autocomplete: 'off', placeholder: 'github_pat_…', 'aria-label': 'Clé GitHub', style: 'flex:1;min-width:0;padding:12px;border-radius:12px;border:2px solid var(--line);background:var(--bg)' });
+  inp.value = d.token; inp.addEventListener('input', e => { d.token = e.target.value; });
+  box.append(el('div', { class: 'step3' }, el('b', {}, '3. Coller la clé ici'),
+    el('div', { class: 'row', style: 'margin-top:8px' }, inp, el('button', { class: 'btn small green', disabled: d.busy ? '' : false, onclick: async () => {
+      const t = d.token.trim(); if (!/^(github_pat_|ghp_)/.test(t)) { d.err = 'ce n\'est pas une clé GitHub (elle commence par github_pat_)'; renderSync(); return; }
+      d.busy = true; d.err = ''; renderSync();
+      try { await Sync.connect(t); d.token = ''; d.busy = false; Sync.start(); toast('Synchro branchée ✓'); } catch (e) { d.busy = false; d.err = e.message; }
+      renderSync();
+    } }, d.busy ? '…' : 'Brancher'))));
+  if (d.err) box.append(el('div', { class: 'notice bad' }, 'Pas encore : ' + d.err + '.'));
+  box.append(el('p', { class: 'small muted' }, 'La clé reste sur ce téléphone. Le dossier doit être privé, l\'appli le vérifie.'));
+}
+
 /* ------------------------- BOOT ------------------------- */
-load(); applyTheme(); go('home');
+load(); applyTheme(); Sync.fromLink(); go('home'); Sync.start();
+addEventListener('hashchange', () => { if (Sync.fromLink()) { Sync.start(); refreshScreen(); } });
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
