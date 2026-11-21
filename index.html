@@ -1,0 +1,809 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>TidyTime</title>
+<meta name="description" content="5 minutes par pièce, tous les jours : le rituel de rangement de la famille.">
+<meta name="theme-color" content="#1f2a44">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TidyTime">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#f6f3ee; --card:#ffffff; --ink:#1f2a44; --muted:#6b7280; --line:#e7e2da;
+  --accent:#ff7a59; --accent2:#2bb673; --warn:#e5484d; --gold:#f5b301;
+  --radius:18px; --shadow:0 6px 20px rgba(31,42,68,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#121624; --card:#1c2236; --ink:#eef1f8; --muted:#9aa3b8; --line:#2a3250; --shadow:0 6px 20px rgba(0,0,0,.35); }
+}
+:root[data-theme="dark"]{ --bg:#121624; --card:#1c2236; --ink:#eef1f8; --muted:#9aa3b8; --line:#2a3250; --shadow:0 6px 20px rgba(0,0,0,.35); }
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+input,select{font:inherit;color:inherit}
+.app{max-width:560px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+.screen{display:none;flex:1;flex-direction:column;padding:16px 16px 96px}
+.screen.on{display:flex}
+h1{font-size:28px;margin:8px 0 4px;letter-spacing:-.02em}
+h2{font-size:20px;margin:20px 0 10px}
+.sub{color:var(--muted);margin:0 0 16px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 18px;border-radius:14px;font-weight:700;background:var(--card);box-shadow:var(--shadow)}
+.sticky{position:sticky;bottom:calc(76px + env(safe-area-inset-bottom));z-index:4;margin-top:8px}
+.btn.primary{background:var(--accent);color:#fff;font-size:20px;padding:20px;width:100%;border-radius:20px}
+.btn.green{background:var(--accent2);color:#fff}
+.btn.ghost{background:transparent;box-shadow:none;border:2px solid var(--line)}
+.btn.small{padding:8px 12px;font-size:14px;border-radius:10px}
+.btn:disabled{opacity:.4}
+.row{display:flex;gap:10px;align-items:center}
+.grow{flex:1}
+.chips{display:flex;flex-wrap:wrap;gap:10px}
+.chip{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:var(--card);box-shadow:var(--shadow);border:3px solid transparent;font-weight:600}
+.chip.sel{border-color:var(--accent)}
+.chip .av{font-size:22px}
+.roomlist{list-style:none;margin:0;padding:0}
+.roomlist li{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line)}
+.roomlist li:last-child{border-bottom:0}
+.dot{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:22px;flex:none;background-size:cover;background-position:center}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.tabbar{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;background:var(--card);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom));z-index:5}
+.tabbar .in{display:flex;max-width:560px;width:100%}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;font-size:12px;gap:2px;padding:6px;border-radius:12px;color:var(--muted)}
+.tab b{font-size:22px;font-weight:400}
+.tab.on{color:var(--accent)}
+.hidebar .tabbar{display:none}
+
+/* Timer screen */
+#run{position:fixed;inset:0;display:none;flex-direction:column;z-index:10;color:#fff;overflow:hidden;user-select:none;-webkit-user-select:none}
+#run.on{display:flex}
+#runBg{position:absolute;inset:0;background-size:cover;background-position:center;transition:background-color .4s}
+#runBg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.15) 40%,rgba(0,0,0,.55))}
+#runEmoji{position:absolute;font-size:46vmin;opacity:.18;left:50%;top:44%;transform:translate(-50%,-50%);pointer-events:none}
+.runtop,.runmid,.runbot{position:relative;z-index:2}
+.runtop{padding:calc(14px + env(safe-area-inset-top)) 16px 0;display:flex;align-items:center;gap:8px}
+.runtop .who{display:flex;gap:4px;font-size:22px}
+.step{font-weight:700;opacity:.9}
+.runmid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 16px}
+.roomname{font-size:clamp(34px,10vw,56px);font-weight:800;letter-spacing:-.02em;text-shadow:0 2px 12px rgba(0,0,0,.35);margin:0 0 8px}
+.ring{position:relative;width:min(72vw,320px);aspect-ratio:1}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .t{position:absolute;inset:0;display:grid;place-items:center;font-size:clamp(52px,17vw,84px);font-weight:800;font-variant-numeric:tabular-nums;text-shadow:0 2px 12px rgba(0,0,0,.35)}
+.hint{margin-top:14px;font-size:18px;font-weight:600;opacity:.95;min-height:1.4em}
+.runbot{padding:0 16px calc(18px + env(safe-area-inset-bottom));display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rbtn{background:rgba(255,255,255,.18);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#fff;border-radius:16px;padding:16px 10px;font-weight:700;font-size:17px}
+.rbtn.big{grid-column:1/-1;background:#fff;color:#1f2a44;font-size:22px;padding:20px}
+.rbtn.stop{background:rgba(229,72,77,.85)}
+#run.ringing #runBg{animation:flash .5s steps(1) infinite}
+#run.ringing .ring .t{animation:pulse .5s ease-in-out infinite alternate}
+@keyframes flash{0%{background-color:#ff3b30;background-image:none}50%{background-color:#ffd60a;background-image:none}}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.12)}}
+.next{margin-top:10px;font-size:18px;opacity:.9}
+
+/* Modals */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:30}
+.modal.on{display:flex}
+.sheet{background:var(--card);color:var(--ink);width:100%;max-width:560px;border-radius:22px 22px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom));max-height:90vh;overflow:auto}
+.field{display:block;margin:10px 0}
+.field span{display:block;font-size:14px;color:var(--muted);margin-bottom:4px}
+.field input[type=text],.field input[type=number],.field select{width:100%;padding:12px;border-radius:12px;border:2px solid var(--line);background:var(--bg)}
+.emojis{display:flex;flex-wrap:wrap;gap:6px}
+.emojis button{font-size:24px;width:44px;height:44px;border-radius:12px;background:var(--bg)}
+.emojis button.sel{outline:3px solid var(--accent)}
+.colors{display:flex;flex-wrap:wrap;gap:8px}
+.colors button{width:36px;height:36px;border-radius:50%}
+.colors button.sel{outline:3px solid var(--ink);outline-offset:2px}
+
+/* Stats */
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.kpi{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:14px}
+.kpi .v{font-size:28px;font-weight:800}
+.kpi .l{font-size:13px;color:var(--muted)}
+.level{display:flex;gap:12px;align-items:center}
+.level .big{font-size:44px}
+.bar{height:12px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--gold));border-radius:999px}
+.seg{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px}
+.seg button{white-space:nowrap;padding:8px 14px;border-radius:999px;background:var(--card);box-shadow:var(--shadow);font-weight:600}
+.seg button.on{background:var(--accent);color:#fff}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.badge{text-align:center;padding:10px 6px;border-radius:14px;background:var(--bg);font-size:12px}
+.badge .e{font-size:30px;display:block}
+.badge.off{opacity:.3;filter:grayscale(1)}
+.heat{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.heat div{aspect-ratio:1;border-radius:6px;background:var(--line);font-size:10px;display:grid;place-items:center;color:var(--muted)}
+.chart svg{width:100%;height:auto;display:block}
+.board li{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.board li:last-child{border:0}
+.board .medal{width:28px;text-align:center;font-size:20px}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;z-index:40;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.on{opacity:1}
+
+/* Done */
+#done .trophy{font-size:96px;text-align:center;margin-top:20px}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- HOME -->
+  <section class="screen on" id="home">
+    <h1>⏰ TidyTime</h1>
+    <p class="sub" id="homeSub">5 minutes par pièce, tous les jours.</p>
+
+    <div class="card" id="streakCard"></div>
+
+    <h2>Qui range aujourd'hui ?</h2>
+    <div class="chips" id="whoChips"></div>
+    <p class="muted small" id="whoHint" style="margin-top:8px"></p>
+
+    <h2>Programme</h2>
+    <div class="card"><ul class="roomlist" id="homeRooms"></ul></div>
+
+    <button class="btn primary sticky" id="startBtn">▶ C'est parti !</button>
+  </section>
+
+  <!-- ROOMS -->
+  <section class="screen" id="rooms">
+    <h1>Pièces</h1>
+    <p class="sub">Dans l'ordre du rangement. Flèches pour réordonner.</p>
+    <div class="card"><ul class="roomlist" id="roomEdit"></ul></div>
+    <button class="btn green" id="addRoom">＋ Ajouter une pièce</button>
+
+    <h2>Personnes</h2>
+    <div class="card"><ul class="roomlist" id="peopleEdit"></ul></div>
+    <button class="btn green" id="addPerson">＋ Ajouter une personne</button>
+  </section>
+
+  <!-- STATS -->
+  <section class="screen" id="stats">
+    <h1>Progrès</h1>
+    <div class="seg" id="statSeg"></div>
+    <div id="statBody"></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="screen" id="settings">
+    <h1>Réglages</h1>
+    <div class="card">
+      <label class="field"><span>Durée par défaut d'une nouvelle pièce (minutes)</span><input type="number" id="setDefault" min="1" max="60"></label>
+      <label class="field"><span>Sonnerie</span>
+        <select id="setSound"><option value="cloche">Cloche</option><option value="bip">Bip-bip réveil</option><option value="fanfare">Fanfare</option></select>
+      </label>
+      <label class="field"><span>Volume</span><input type="range" id="setVol" min="0.1" max="1" step="0.1" style="width:100%"></label>
+      <div class="row"><button class="btn small" id="testSound">🔊 Tester le son</button></div>
+      <label class="field row" style="margin-top:14px"><input type="checkbox" id="setVib"> <span style="margin:0">Faire vibrer le téléphone</span></label>
+      <label class="field row"><input type="checkbox" id="setTick"> <span style="margin:0">Petit bip pendant les 5 dernières secondes</span></label>
+      <label class="field"><span>Thème</span>
+        <select id="setTheme"><option value="">Automatique</option><option value="light">Clair</option><option value="dark">Sombre</option></select>
+      </label>
+    </div>
+    <h2>Sauvegarde</h2>
+    <div class="card">
+      <p class="small muted" style="margin-top:0">Tout est enregistré sur ce téléphone uniquement. Exporte de temps en temps pour ne pas perdre les stats.</p>
+      <div class="row" style="flex-wrap:wrap">
+        <button class="btn small" id="exportBtn">⬇ Exporter</button>
+        <label class="btn small">⬆ Importer<input type="file" id="importFile" accept="application/json" hidden></label>
+        <button class="btn small ghost" id="resetStats">Effacer les stats</button>
+      </div>
+    </div>
+    <p class="small muted">Astuce : pendant le minuteur l'écran reste allumé. Si tu verrouilles le téléphone, l'alarme sonnera quand tu le rallumes, pas avant.</p>
+    <p class="small muted" id="version"></p>
+  </section>
+
+  <nav class="tabbar"><div class="in">
+    <button class="tab on" data-go="home"><b>🏠</b>Accueil</button>
+    <button class="tab" data-go="rooms"><b>🧹</b>Pièces</button>
+    <button class="tab" data-go="stats"><b>🏆</b>Progrès</button>
+    <button class="tab" data-go="settings"><b>⚙️</b>Réglages</button>
+  </div></nav>
+</div>
+
+<!-- DONE -->
+<div class="modal" id="doneModal"><div class="sheet" id="doneBody"></div></div>
+
+<!-- RUN -->
+<div id="run">
+  <div id="runBg"></div>
+  <div id="runEmoji"></div>
+  <div class="runtop"><span class="step" id="runStep"></span><span class="grow"></span><span class="who" id="runWho"></span></div>
+  <div class="runmid" id="runTap">
+    <p class="roomname" id="runName"></p>
+    <div class="ring">
+      <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="7"/><circle id="ringArc" cx="50" cy="50" r="45" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-dasharray="282.74" stroke-dashoffset="0"/></svg>
+      <div class="t" id="runTime">5:00</div>
+    </div>
+    <div class="hint" id="runHint"></div>
+    <div class="next" id="runNext"></div>
+  </div>
+  <div class="runbot" id="runBtns"></div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal" id="editModal"><div class="sheet" id="editBody"></div></div>
+<div class="toast" id="toast"></div>
+<canvas class="confetti" id="confetti"></canvas>
+
+<script>
+(() => {
+'use strict';
+const VERSION = '1.0.0';
+const KEY = 'tidytime-v1';
+const PHOTO = id => 'tidytime-photo-' + id;
+const $ = s => document.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (k === 'style') e.style.cssText = v; else if (v !== false && v != null) e.setAttribute(k, v); } for (const k of kids.flat()) if (k != null) e.append(k.nodeType ? k : document.createTextNode(k)); return e; };
+const uid = () => Math.random().toString(36).slice(2, 10);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const ROOM_EMOJIS = ['🚪','🛋️','🍳','🛁','🚽','🛏️','🧸','📚','🧺','🪴','🖥️','🚗','🧥','🍽️','🎮','🏠','🧹','🪜','🐶','🌳'];
+const PERSON_EMOJIS = ['🦁','🐯','🐼','🦊','🐸','🐵','🦄','🐙','🐢','🦖','🐱','🐶','🐰','🐻','🐧','🚀','⭐','🌈','⚽','🎸'];
+const COLORS = ['#ff7a59','#f5b301','#2bb673','#14b8a6','#3b82f6','#6366f1','#a855f7','#ec4899','#ef4444','#64748b'];
+
+const defaults = () => ({
+  rooms: [
+    { id: uid(), name: 'Entrée', emoji: '🚪', color: '#f5b301', minutes: 5 },
+    { id: uid(), name: 'Salon', emoji: '🛋️', color: '#3b82f6', minutes: 5 },
+    { id: uid(), name: 'Cuisine', emoji: '🍳', color: '#2bb673', minutes: 5 },
+    { id: uid(), name: 'Salle de bain', emoji: '🛁', color: '#14b8a6', minutes: 5 },
+    { id: uid(), name: 'Chambres', emoji: '🛏️', color: '#a855f7', minutes: 5 },
+  ],
+  people: [ { id: uid(), name: 'Moi', emoji: '🦁', color: '#ff7a59' } ],
+  lastWho: [],
+  sessions: [],
+  settings: { defaultMin: 5, sound: 'cloche', volume: 0.9, vibrate: true, tick: true, theme: '' },
+});
+
+let S;
+function load() {
+  try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
+  if (!S || !Array.isArray(S.rooms)) S = defaults();
+  S.settings = Object.assign(defaults().settings, S.settings || {});
+  S.sessions = S.sessions || []; S.people = S.people || []; S.lastWho = S.lastWho || [];
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Impossible d\'enregistrer (mémoire pleine ?)'); } }
+function getPhoto(id) { try { return localStorage.getItem(PHOTO(id)); } catch (e) { return null; } }
+function setPhoto(id, data) { try { data ? localStorage.setItem(PHOTO(id), data) : localStorage.removeItem(PHOTO(id)); return true; } catch (e) { toast('Photo trop lourde pour la mémoire'); return false; } }
+
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 2200); }
+const fmt = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const dayKey = d => { d = new Date(d); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+
+/* ------------------------- AUDIO ------------------------- */
+let AC = null, alarmTimer = null, ringStopTimer = null;
+function audio() {
+  if (!AC) { const C = window.AudioContext || window.webkitAudioContext; if (C) AC = new C(); }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function unlockAudio() { // must be called from a user gesture (iOS)
+  const ac = audio(); if (!ac) return;
+  const b = ac.createBuffer(1, 1, 22050); const s = ac.createBufferSource(); s.buffer = b; s.connect(ac.destination); s.start(0);
+}
+function tone(freq, start, dur, type = 'sine', gain = 1) {
+  const ac = audio(); if (!ac) return;
+  const t0 = ac.currentTime + start; const o = ac.createOscillator(); const g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  const v = S.settings.volume * gain * 0.6;
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(v, t0 + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+}
+const SOUNDS = {
+  cloche: () => { [0, 0.6].forEach(o => { tone(880, o, 1.2, 'sine'); tone(1320, o, 0.9, 'sine', .5); tone(1760, o, 0.6, 'triangle', .25); }); return 1400; },
+  bip: () => { for (let i = 0; i < 4; i++) tone(1000, i * 0.18, 0.12, 'square', .5); return 1100; },
+  fanfare: () => { [[523,0],[659,.15],[784,.3],[1047,.45],[784,.75],[1047,.9]].forEach(([f,t]) => { tone(f, t, .28, 'sawtooth', .35); tone(f, t, .3, 'sine', .6); }); return 1600; },
+};
+function playOnce(name) { return (SOUNDS[name || S.settings.sound] || SOUNDS.cloche)(); }
+function startAlarm() {
+  stopAlarm();
+  const loop = () => { const len = playOnce(); alarmTimer = setTimeout(loop, len + 500); };
+  loop();
+  if (S.settings.vibrate && navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400, 200, 400]);
+  ringStopTimer = setTimeout(() => { stopAlarm(true); }, 60000); // stop sound after 1 min, keep flashing
+}
+function stopAlarm(keepVisual) {
+  clearTimeout(alarmTimer); clearTimeout(ringStopTimer); alarmTimer = null;
+  if (navigator.vibrate) navigator.vibrate(0);
+}
+function cheer() { tone(784, 0, .15, 'triangle', .6); tone(1047, .12, .25, 'triangle', .6); }
+function tick() { tone(1500, 0, .05, 'square', .2); }
+
+/* ------------------------- WAKE LOCK ------------------------- */
+let wakeLock = null;
+async function lockScreen() { try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (e) {} }
+function unlockScreen() { try { wakeLock && wakeLock.release(); } catch (e) {} wakeLock = null; }
+
+/* ------------------------- NAV ------------------------- */
+function go(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === name));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.go === name));
+  ({ home: renderHome, rooms: renderRooms, stats: renderStats, settings: renderSettings })[name]();
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => go(t.dataset.go)));
+
+/* ------------------------- STATS ENGINE ------------------------- */
+function sessionsFor(pid) { return pid ? S.sessions.filter(s => s.people.includes(pid)) : S.sessions; }
+function sessionMinutes(s) { return s.rooms.reduce((a, r) => a + (r.status === 'skipped' ? 0 : r.spent), 0) / 60; }
+function sessionPoints(s) {
+  let p = 0; const done = s.rooms.filter(r => r.status !== 'skipped');
+  p += Math.round(done.reduce((a, r) => a + r.spent, 0) / 60);     // 1 point / minute rangée
+  p += done.length * 2;                                              // +2 par pièce terminée
+  if (done.length === s.rooms.length && s.rooms.length && !s.stopped) p += 5; // bonus tout fini
+  return p;
+}
+function streakInfo(list) {
+  const days = new Set(list.map(s => dayKey(s.start)));
+  let cur = 0; let d = new Date();
+  if (!days.has(dayKey(d))) d = addDays(d, -1); // today not yet done: streak still alive from yesterday
+  while (days.has(dayKey(d))) { cur++; d = addDays(d, -1); }
+  const sorted = [...days].sort(); let best = 0, run = 0, prev = null;
+  for (const k of sorted) { const dt = new Date(k + 'T12:00'); run = prev && Math.round((dt - prev) / 864e5) === 1 ? run + 1 : 1; best = Math.max(best, run); prev = dt; }
+  return { cur, best, days: days.size, today: days.has(dayKey(new Date())) };
+}
+const LEVELS = [
+  [0, '🐣', 'Apprenti rangeur'], [100, '🧦', 'Chasseur de chaussettes'], [250, '🧹', 'Rangeur confirmé'],
+  [500, '🦸', 'Super-rangeur'], [900, '🏅', 'Pro du rangement'], [1500, '🧙', 'Magicien du rangement'],
+  [2500, '👑', 'Roi / Reine du rangement'], [4000, '🌟', 'Légende de la maison'],
+];
+function level(points) {
+  let i = 0; while (i + 1 < LEVELS.length && points >= LEVELS[i + 1][0]) i++;
+  const [min, e, name] = LEVELS[i]; const next = LEVELS[i + 1];
+  return { e, name, n: i + 1, pct: next ? (points - min) / (next[0] - min) : 1, toNext: next ? next[0] - points : 0, nextName: next ? next[2] : null };
+}
+function badges(list, st) {
+  const mins = list.reduce((a, s) => a + sessionMinutes(s), 0);
+  const full = list.filter(s => !s.stopped && s.rooms.every(r => r.status !== 'skipped')).length;
+  const early = list.some(s => new Date(s.start).getHours() < 9);
+  const late = list.some(s => new Date(s.start).getHours() >= 20);
+  const weekend = list.filter(s => [0, 6].includes(new Date(s.start).getDay())).length;
+  const fast = list.some(s => s.rooms.some(r => r.status === 'early'));
+  return [
+    ['🎉', 'Première fois', list.length >= 1],
+    ['✅', 'Tout fini', full >= 1],
+    ['🔥', '3 jours de suite', st.best >= 3],
+    ['🚀', '7 jours de suite', st.best >= 7],
+    ['💎', '30 jours de suite', st.best >= 30],
+    ['🔟', '10 rangements', list.length >= 10],
+    ['💯', '100 minutes', mins >= 100],
+    ['⏱️', '10 heures', mins >= 600],
+    ['🌅', 'Lève-tôt (avant 9h)', early],
+    ['🌙', 'Couche-tard (après 20h)', late],
+    ['🏖️', 'Week-end aussi', weekend >= 4],
+    ['⚡', 'Fini en avance', fast],
+  ];
+}
+
+/* ------------------------- HOME ------------------------- */
+function renderHome() {
+  // streak card (family)
+  const st = streakInfo(S.sessions);
+  const pts = S.sessions.reduce((a, s) => a + sessionPoints(s), 0);
+  $('#streakCard').innerHTML = st.today
+    ? `<div class="row"><div style="font-size:40px">🔥</div><div><b>${st.cur} jour${st.cur > 1 ? 's' : ''} d'affilée !</b><div class="muted small">Rangement fait aujourd'hui. Bravo !</div></div></div>`
+    : st.cur
+      ? `<div class="row"><div style="font-size:40px">🔥</div><div><b>Série de ${st.cur} jour${st.cur > 1 ? 's' : ''}</b><div class="muted small">Range aujourd'hui pour ne pas la perdre.</div></div></div>`
+      : `<div class="row"><div style="font-size:40px">🌱</div><div><b>On commence une série ?</b><div class="muted small">Un petit rangement par jour, et la maison reste rangée.</div></div></div>`;
+
+  const chips = $('#whoChips'); chips.innerHTML = '';
+  const valid = S.lastWho.filter(id => S.people.some(p => p.id === id));
+  if (!valid.length && S.people.length) S.lastWho = S.people.map(p => p.id); else S.lastWho = valid;
+  S.people.forEach(p => {
+    const on = S.lastWho.includes(p.id);
+    chips.append(el('button', { class: 'chip' + (on ? ' sel' : ''), style: on ? `border-color:${p.color}` : '', onclick: () => { S.lastWho = on ? S.lastWho.filter(x => x !== p.id) : [...S.lastWho, p.id]; save(); renderHome(); } }, el('span', { class: 'av' }, p.emoji), p.name));
+  });
+  chips.append(el('button', { class: 'chip', onclick: () => editPerson(null) }, '＋'));
+  $('#whoHint').textContent = S.lastWho.length ? 'Touche un prénom pour l\'ajouter ou le retirer.' : 'Choisis au moins une personne.';
+
+  const ul = $('#homeRooms'); ul.innerHTML = '';
+  let total = 0;
+  S.rooms.forEach((r, i) => { total += r.minutes; ul.append(el('li', {}, roomDot(r), el('div', { class: 'grow' }, el('b', {}, `${i + 1}. ${r.name}`)), el('span', { class: 'muted' }, r.minutes + ' min'))); });
+  if (!S.rooms.length) ul.append(el('li', { class: 'muted' }, 'Aucune pièce. Ajoute-en dans l\'onglet Pièces.'));
+  $('#homeSub').textContent = S.rooms.length ? `${S.rooms.length} pièce${S.rooms.length > 1 ? 's' : ''}, ${total} minutes en tout.` : '5 minutes par pièce, tous les jours.';
+  $('#startBtn').disabled = !S.rooms.length || !S.lastWho.length;
+  save();
+}
+function roomDot(r) {
+  const ph = getPhoto(r.id);
+  return el('div', { class: 'dot', style: `background-color:${r.color}33;${ph ? `background-image:url(${ph})` : ''}` }, ph ? '' : r.emoji);
+}
+$('#startBtn').addEventListener('click', () => { unlockAudio(); startRun(); });
+
+/* ------------------------- RUN ------------------------- */
+let R = null, raf = null;
+function startRun() {
+  R = { id: uid(), start: Date.now(), people: [...S.lastWho], rooms: S.rooms.map(r => ({ id: r.id, name: r.name, emoji: r.emoji, color: r.color, planned: r.minutes * 60, spent: 0, status: 'pending' })), idx: 0, phase: 'ready' };
+  $('#run').classList.add('on'); document.body.classList.add('hidebar');
+  lockScreen();
+  history.pushState({ run: 1 }, '');
+  beginRoom();
+}
+function cur() { return R.rooms[R.idx]; }
+function beginRoom() {
+  const r = cur(); R.phase = 'running'; R.endAt = Date.now() + r.planned * 1000; R.roomStart = Date.now(); R.pausedFor = 0; R.lastTick = null;
+  cheer(); draw(); loop();
+}
+function elapsedMs() { const now = R.phase === 'paused' ? R.pausedAt : Date.now(); return now - R.roomStart - R.pausedFor; }
+function remainingMs() { return cur().planned * 1000 - elapsedMs(); }
+function loop() {
+  cancelAnimationFrame(raf);
+  const step = () => {
+    if (!R || R.phase !== 'running') return;
+    const rem = remainingMs();
+    if (rem <= 0) { finishRoom('done'); return; }
+    if (S.settings.tick && rem <= 5000) { const s = Math.ceil(rem / 1000); if (s !== R.lastTick) { R.lastTick = s; tick(); } }
+    paintTime(rem);
+    raf = requestAnimationFrame(step);
+  };
+  step();
+}
+// keep checking in background-ish situations where rAF is throttled
+setInterval(() => { if (R && R.phase === 'running' && remainingMs() <= 0) finishRoom('done'); }, 500);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && R) { lockScreen(); if (R.phase === 'running') loop(); } });
+
+function paintTime(rem) {
+  const r = cur(); $('#runTime').textContent = fmt(rem);
+  const frac = Math.max(0, Math.min(1, rem / (r.planned * 1000)));
+  $('#ringArc').style.strokeDashoffset = (282.74 * (1 - frac)).toFixed(1);
+}
+function finishRoom(status) {
+  const r = cur();
+  r.spent = Math.min(r.planned, Math.round(elapsedMs() / 1000));
+  r.status = status;
+  cancelAnimationFrame(raf);
+  if (status === 'done') { R.phase = 'ringing'; startAlarm(); }
+  else { R.phase = 'between'; if (status === 'early') cheer(); }
+  draw();
+}
+function advance() { // after ringing or between: go to "ready" for next room or finish
+  stopAlarm();
+  if (R.idx >= R.rooms.length - 1) { endRun(false); return; }
+  R.idx++; R.phase = 'ready'; draw();
+}
+function onTap() {
+  if (!R) return;
+  if (R.phase === 'ringing') { advance(); }
+  else if (R.phase === 'between') { advance(); }
+  else if (R.phase === 'ready') { beginRoom(); }
+  else if (R.phase === 'paused') { resume(); }
+}
+function pause() { R.phase = 'paused'; R.pausedAt = Date.now(); cancelAnimationFrame(raf); draw(); }
+function resume() { R.pausedFor += Date.now() - R.pausedAt; R.phase = 'running'; draw(); loop(); }
+function skipReady() { cur().status = 'skipped'; cur().spent = 0; if (R.idx >= R.rooms.length - 1) { endRun(false); return; } R.idx++; draw(); }
+function askStop() {
+  const wasRunning = R.phase === 'running';
+  if (wasRunning) pause();
+  sheet($('#editModal'), $('#editBody'), [
+    el('h2', { style: 'margin-top:0' }, 'Tout arrêter ?'),
+    el('p', { class: 'muted' }, 'Le temps déjà rangé est gardé dans les stats.'),
+    el('div', { class: 'row' },
+      el('button', { class: 'btn grow', onclick: () => { closeSheet($('#editModal')); if (wasRunning) resume(); } }, 'Continuer'),
+      el('button', { class: 'btn grow', style: 'background:var(--warn);color:#fff', onclick: () => { closeSheet($('#editModal')); endRun(true); } }, 'Arrêter')),
+  ]);
+}
+function endRun(stopped) {
+  stopAlarm(); cancelAnimationFrame(raf); unlockScreen();
+  const r = R.idx < R.rooms.length ? cur() : null;
+  if (stopped && r && (R.phase === 'running' || R.phase === 'paused')) { r.spent = Math.min(r.planned, Math.round(elapsedMs() / 1000)); r.status = r.spent >= 30 ? 'partial' : 'skipped'; }
+  R.rooms.forEach(x => { if (x.status === 'pending') x.status = 'skipped'; });
+  const sess = { id: R.id, start: R.start, end: Date.now(), people: R.people, stopped, rooms: R.rooms.map(({ id, name, emoji, planned, spent, status }) => ({ id, name, emoji, planned, spent, status })) };
+  const any = sess.rooms.some(x => x.status !== 'skipped' && x.spent > 0);
+  const before = Object.fromEntries(S.people.map(p => [p.id, level(sessionsFor(p.id).reduce((a, s) => a + sessionPoints(s), 0)).n]));
+  if (any) { S.sessions.push(sess); save(); }
+  R = null;
+  $('#run').classList.remove('on', 'ringing'); document.body.classList.remove('hidebar');
+  if (history.state && history.state.run) history.back();
+  go('home');
+  if (any) showDone(sess, before); else toast('Rien enregistré cette fois.');
+}
+function showDone(sess, before) {
+  const pts = sessionPoints(sess); const mins = sessionMinutes(sess);
+  const done = sess.rooms.filter(r => r.status !== 'skipped').length;
+  const kids = sess.people.map(id => S.people.find(p => p.id === id)).filter(Boolean);
+  const ups = kids.filter(p => level(sessionsFor(p.id).reduce((a, s) => a + sessionPoints(s), 0)).n > before[p.id]);
+  const st = streakInfo(S.sessions);
+  sheet($('#doneModal'), $('#doneBody'), [
+    el('div', { style: 'font-size:80px;text-align:center' }, sess.stopped ? '👍' : '🏆'),
+    el('h1', { style: 'text-align:center' }, sess.stopped ? 'Bien joué !' : 'Maison rangée !'),
+    el('p', { style: 'text-align:center', class: 'muted' }, `${done} pièce${done > 1 ? 's' : ''} · ${Math.round(mins)} min · +${pts} ⭐ chacun`),
+    el('p', { style: 'text-align:center;font-weight:700' }, `🔥 Série : ${st.cur} jour${st.cur > 1 ? 's' : ''}`),
+    ...ups.map(p => { const L = level(sessionsFor(p.id).reduce((a, s) => a + sessionPoints(s), 0)); return el('div', { class: 'card', style: 'text-align:center' }, el('div', { style: 'font-size:40px' }, L.e), el('b', {}, `${p.emoji} ${p.name} passe niveau ${L.n} !`), el('div', { class: 'muted' }, L.name)); }),
+    el('button', { class: 'btn primary', style: 'margin-top:12px', onclick: () => closeSheet($('#doneModal')) }, 'Super !'),
+    el('button', { class: 'btn ghost', style: 'width:100%;margin-top:8px', onclick: () => { closeSheet($('#doneModal')); go('stats'); } }, 'Voir les progrès'),
+  ]);
+  confetti();
+}
+function draw() {
+  if (!R) return;
+  const r = cur(); const run = $('#run');
+  const ph = getPhoto(r.id);
+  $('#runBg').style.backgroundColor = r.color; $('#runBg').style.backgroundImage = ph ? `url(${ph})` : 'none';
+  $('#runEmoji').textContent = ph ? '' : r.emoji;
+  $('#runName').textContent = r.name;
+  $('#runStep').textContent = `Pièce ${R.idx + 1}/${R.rooms.length}`;
+  $('#runWho').textContent = R.people.map(id => (S.people.find(p => p.id === id) || {}).emoji || '').join('');
+  run.classList.toggle('ringing', R.phase === 'ringing');
+  const nxt = R.rooms[R.idx + 1];
+  const B = $('#runBtns'); B.innerHTML = '';
+  const hint = $('#runHint'), next = $('#runNext');
+  next.textContent = '';
+  if (R.phase === 'running' || R.phase === 'paused') {
+    paintTime(remainingMs());
+    hint.textContent = R.phase === 'paused' ? '⏸ En pause, touche pour reprendre' : 'On range ! 💪';
+    if (nxt) next.textContent = `Ensuite : ${nxt.emoji} ${nxt.name}`;
+    B.append(
+      el('button', { class: 'rbtn big', onclick: e => { e.stopPropagation(); finishRoom('early'); } }, '✓ Fini ! Pièce suivante'),
+      el('button', { class: 'rbtn', onclick: e => { e.stopPropagation(); R.phase === 'paused' ? resume() : pause(); } }, R.phase === 'paused' ? '▶ Reprendre' : '⏸ Pause'),
+      el('button', { class: 'rbtn stop', onclick: e => { e.stopPropagation(); askStop(); } }, '■ Tout arrêter'));
+  } else if (R.phase === 'ringing') {
+    $('#runTime').textContent = '0:00'; $('#ringArc').style.strokeDashoffset = 282.74;
+    hint.textContent = '⏰ Temps écoulé ! Touche l\'écran';
+    B.append(el('button', { class: 'rbtn big', onclick: e => { e.stopPropagation(); advance(); } }, '🔕 Arrêter l\'alarme'));
+  } else if (R.phase === 'between') {
+    hint.textContent = '🎉 Bravo, fini en avance !';
+    $('#runTime').textContent = '✓'; $('#ringArc').style.strokeDashoffset = 0;
+    B.append(el('button', { class: 'rbtn big', onclick: e => { e.stopPropagation(); advance(); } }, nxt ? `Continuer → ${nxt.emoji} ${nxt.name}` : '🏁 Terminer'));
+  } else if (R.phase === 'ready') {
+    $('#runTime').textContent = fmt(r.planned * 1000); $('#ringArc').style.strokeDashoffset = 0;
+    hint.textContent = '👉 Touche pour lancer le minuteur';
+    if (nxt) next.textContent = `Ensuite : ${nxt.emoji} ${nxt.name}`;
+    B.append(
+      el('button', { class: 'rbtn big', onclick: e => { e.stopPropagation(); beginRoom(); } }, `▶ Go ${r.name} !`),
+      el('button', { class: 'rbtn', onclick: e => { e.stopPropagation(); skipReady(); } }, '⏭ Passer'),
+      el('button', { class: 'rbtn stop', onclick: e => { e.stopPropagation(); askStop(); } }, '■ Tout arrêter'));
+  }
+}
+$('#run').addEventListener('click', e => { if (e.target.closest('.runbot') || e.target.closest('.runtop')) return; onTap(); });
+window.addEventListener('popstate', () => { if (R) { history.pushState({ run: 1 }, ''); askStop(); } });
+
+/* ------------------------- SHEETS ------------------------- */
+function sheet(modal, body, kids) { body.innerHTML = ''; body.append(...kids); modal.classList.add('on'); }
+function closeSheet(modal) { modal.classList.remove('on'); }
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m && m.id !== 'doneModal' && !R) closeSheet(m); }));
+
+function pickers(kind, cur, onPick, list) {
+  const wrap = el('div', { class: kind === 'color' ? 'colors' : 'emojis' });
+  list.forEach(v => wrap.append(el('button', { class: v === cur ? 'sel' : '', style: kind === 'color' ? `background:${v}` : '', onclick: ev => { wrap.querySelectorAll('button').forEach(b => b.classList.remove('sel')); ev.currentTarget.classList.add('sel'); onPick(v); } }, kind === 'color' ? '' : v)));
+  return wrap;
+}
+
+function editRoom(room) {
+  const isNew = !room; const r = room ? { ...room } : { id: uid(), name: '', emoji: '🏠', color: COLORS[S.rooms.length % COLORS.length], minutes: S.settings.defaultMin };
+  let photo = getPhoto(r.id); let photoChanged = false;
+  const name = el('input', { type: 'text', value: r.name, placeholder: 'ex. Salon' });
+  const mins = el('input', { type: 'number', value: r.minutes, min: 1, max: 60 });
+  const prev = el('div', { class: 'dot', style: 'width:72px;height:72px' });
+  const paintPrev = () => { prev.style.backgroundColor = r.color + '55'; prev.style.backgroundImage = photo ? `url(${photo})` : 'none'; prev.textContent = photo ? '' : r.emoji; };
+  paintPrev();
+  const file = el('input', { type: 'file', accept: 'image/*', hidden: true });
+  file.addEventListener('change', async () => { const f = file.files[0]; if (!f) return; photo = await shrink(f); photoChanged = true; paintPrev(); });
+  sheet($('#editModal'), $('#editBody'), [
+    el('h2', { style: 'margin-top:0' }, isNew ? 'Nouvelle pièce' : 'Modifier la pièce'),
+    el('label', { class: 'field' }, el('span', {}, 'Nom'), name),
+    el('label', { class: 'field' }, el('span', {}, 'Durée (minutes)'), mins),
+    el('div', { class: 'field' }, el('span', {}, 'Icône'), pickers('emoji', r.emoji, v => { r.emoji = v; paintPrev(); }, ROOM_EMOJIS)),
+    el('div', { class: 'field' }, el('span', {}, 'Couleur de fond'), pickers('color', r.color, v => { r.color = v; paintPrev(); }, COLORS)),
+    el('div', { class: 'field' }, el('span', {}, 'Photo de la pièce en fond (optionnel)'),
+      el('div', { class: 'row' }, prev,
+        el('label', { class: 'btn small' }, '📷 Choisir', file),
+        el('button', { class: 'btn small ghost', onclick: () => { photo = null; photoChanged = true; paintPrev(); } }, 'Retirer'))),
+    el('div', { class: 'row', style: 'margin-top:16px' },
+      !isNew ? el('button', { class: 'btn ghost', style: 'color:var(--warn)', onclick: () => { S.rooms = S.rooms.filter(x => x.id !== r.id); setPhoto(r.id, null); save(); closeSheet($('#editModal')); renderRooms(); } }, 'Supprimer') : null,
+      el('span', { class: 'grow' }),
+      el('button', { class: 'btn ghost', onclick: () => closeSheet($('#editModal')) }, 'Annuler'),
+      el('button', { class: 'btn green', onclick: () => {
+        r.name = name.value.trim() || 'Pièce'; r.minutes = Math.max(1, Math.min(60, parseInt(mins.value, 10) || 5));
+        if (photoChanged) setPhoto(r.id, photo);
+        if (isNew) S.rooms.push(r); else S.rooms[S.rooms.findIndex(x => x.id === r.id)] = r;
+        save(); closeSheet($('#editModal')); renderRooms();
+      } }, 'Enregistrer')),
+  ]);
+  if (isNew) setTimeout(() => name.focus(), 50);
+}
+function shrink(file) {
+  return new Promise(res => {
+    const img = new Image(); const url = URL.createObjectURL(file);
+    img.onload = () => { const m = 900; const k = Math.min(1, m / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = img.width * k; c.height = img.height * k; c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.7)); };
+    img.onerror = () => res(null); img.src = url;
+  });
+}
+function editPerson(person) {
+  const isNew = !person; const p = person ? { ...person } : { id: uid(), name: '', emoji: PERSON_EMOJIS[S.people.length % PERSON_EMOJIS.length], color: COLORS[(S.people.length + 3) % COLORS.length] };
+  const name = el('input', { type: 'text', value: p.name, placeholder: 'Prénom' });
+  sheet($('#editModal'), $('#editBody'), [
+    el('h2', { style: 'margin-top:0' }, isNew ? 'Nouvelle personne' : 'Modifier'),
+    el('label', { class: 'field' }, el('span', {}, 'Prénom'), name),
+    el('div', { class: 'field' }, el('span', {}, 'Avatar'), pickers('emoji', p.emoji, v => p.emoji = v, PERSON_EMOJIS)),
+    el('div', { class: 'field' }, el('span', {}, 'Couleur'), pickers('color', p.color, v => p.color = v, COLORS)),
+    el('div', { class: 'row', style: 'margin-top:16px' },
+      !isNew ? el('button', { class: 'btn ghost', style: 'color:var(--warn)', onclick: () => { if (S.people.length <= 1) { toast('Il faut au moins une personne'); return; } S.people = S.people.filter(x => x.id !== p.id); save(); closeSheet($('#editModal')); renderRooms(); } }, 'Supprimer') : null,
+      el('span', { class: 'grow' }),
+      el('button', { class: 'btn ghost', onclick: () => closeSheet($('#editModal')) }, 'Annuler'),
+      el('button', { class: 'btn green', onclick: () => {
+        p.name = name.value.trim() || 'Sans nom';
+        if (isNew) { S.people.push(p); S.lastWho.push(p.id); } else S.people[S.people.findIndex(x => x.id === p.id)] = p;
+        save(); closeSheet($('#editModal')); document.querySelector('#home.on') ? renderHome() : renderRooms();
+      } }, 'Enregistrer')),
+  ]);
+  if (isNew) setTimeout(() => name.focus(), 50);
+}
+
+/* ------------------------- ROOMS SCREEN ------------------------- */
+function renderRooms() {
+  const ul = $('#roomEdit'); ul.innerHTML = '';
+  S.rooms.forEach((r, i) => {
+    const mv = (d) => { const j = i + d; if (j < 0 || j >= S.rooms.length) return; [S.rooms[i], S.rooms[j]] = [S.rooms[j], S.rooms[i]]; save(); renderRooms(); };
+    ul.append(el('li', {},
+      roomDot(r),
+      el('button', { class: 'grow', style: 'text-align:left', onclick: () => editRoom(r) }, el('b', {}, `${i + 1}. ${r.name}`), el('div', { class: 'muted small' }, `${r.minutes} min · toucher pour modifier`)),
+      el('button', { class: 'btn small', disabled: i === 0 ? '' : false, onclick: () => mv(-1), 'aria-label': 'Monter' }, '▲'),
+      el('button', { class: 'btn small', disabled: i === S.rooms.length - 1 ? '' : false, onclick: () => mv(1), 'aria-label': 'Descendre' }, '▼')));
+  });
+  if (!S.rooms.length) ul.append(el('li', { class: 'muted' }, 'Aucune pièce pour l\'instant.'));
+  const pl = $('#peopleEdit'); pl.innerHTML = '';
+  S.people.forEach(p => pl.append(el('li', {},
+    el('div', { class: 'dot', style: `background:${p.color}33` }, p.emoji),
+    el('button', { class: 'grow', style: 'text-align:left', onclick: () => editPerson(p) }, el('b', {}, p.name), el('div', { class: 'muted small' }, 'toucher pour modifier')))));
+}
+$('#addRoom').addEventListener('click', () => editRoom(null));
+$('#addPerson').addEventListener('click', () => editPerson(null));
+
+/* ------------------------- STATS SCREEN ------------------------- */
+let statWho = 'famille';
+function renderStats() {
+  const seg = $('#statSeg'); seg.innerHTML = '';
+  [['famille', '👨‍👩‍👧‍👦 Famille'], ...S.people.map(p => [p.id, `${p.emoji} ${p.name}`])].forEach(([id, label]) =>
+    seg.append(el('button', { class: statWho === id ? 'on' : '', onclick: () => { statWho = id; renderStats(); } }, label)));
+  if (statWho !== 'famille' && !S.people.some(p => p.id === statWho)) statWho = 'famille';
+  const pid = statWho === 'famille' ? null : statWho;
+  const list = sessionsFor(pid);
+  const body = $('#statBody'); body.innerHTML = '';
+  const st = streakInfo(list);
+  const mins = list.reduce((a, s) => a + sessionMinutes(s), 0);
+  const roomsDone = list.reduce((a, s) => a + s.rooms.filter(r => r.status !== 'skipped').length, 0);
+
+  if (pid) {
+    const pts = list.reduce((a, s) => a + sessionPoints(s), 0); const L = level(pts);
+    body.append(el('div', { class: 'card' },
+      el('div', { class: 'level' }, el('div', { class: 'big' }, L.e), el('div', { class: 'grow' }, el('div', { class: 'muted small' }, `Niveau ${L.n}`), el('b', { style: 'font-size:20px' }, L.name), el('div', { class: 'small' }, `${pts} ⭐`))),
+      el('div', { class: 'bar' }, el('i', { style: `width:${Math.round(L.pct * 100)}%` })),
+      el('div', { class: 'muted small', style: 'margin-top:6px' }, L.nextName ? `Encore ${L.toNext} ⭐ pour devenir « ${L.nextName} »` : 'Niveau maximum atteint !')));
+  } else {
+    // leaderboard: this week & all time
+    const weekStart = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); })();
+    const rows = S.people.map(p => { const l = sessionsFor(p.id); return { p, week: l.filter(s => s.start >= weekStart).reduce((a, s) => a + sessionPoints(s), 0), all: l.reduce((a, s) => a + sessionPoints(s), 0) }; }).sort((a, b) => b.week - a.week || b.all - a.all);
+    const medals = ['🥇', '🥈', '🥉'];
+    body.append(el('div', { class: 'card' }, el('b', {}, 'Classement de la semaine'),
+      el('ul', { class: 'roomlist board' }, rows.map((x, i) => { const L = level(x.all); return el('li', {}, el('span', { class: 'medal' }, x.week ? (medals[i] || '') : ''), el('span', { style: 'font-size:24px' }, x.p.emoji), el('div', { class: 'grow' }, el('b', {}, x.p.name), el('div', { class: 'muted small' }, `${L.e} Niv. ${L.n} · ${x.all} ⭐ au total`)), el('b', {}, `${x.week} ⭐`)); }))));
+  }
+
+  body.append(el('div', { class: 'kpis' },
+    kpi(`🔥 ${st.cur}`, 'jours d\'affilée'), kpi(`🏅 ${st.best}`, 'meilleure série'),
+    kpi(`${Math.round(mins)}`, 'minutes rangées'), kpi(`${st.days}`, 'jours de rangement'),
+    kpi(`${list.length}`, 'rangements'), kpi(`${roomsDone}`, 'pièces rangées')));
+
+  body.append(el('h2', {}, 'Minutes par jour (14 derniers jours)'), el('div', { class: 'card chart' }, barChart(list)));
+  body.append(el('h2', {}, 'Calendrier (5 semaines)'), el('div', { class: 'card' }, heatmap(list)));
+  body.append(el('h2', {}, 'Par semaine'), el('div', { class: 'card chart' }, weekChart(list)));
+  if (!pid && S.people.length > 1) body.append(el('h2', {}, 'Minutes par personne'), el('div', { class: 'card' }, perPerson()));
+  body.append(el('h2', {}, 'Par pièce'), el('div', { class: 'card' }, perRoom(list)));
+  body.append(el('h2', {}, 'Badges'), el('div', { class: 'card' }, el('div', { class: 'badges' }, badges(list, st).map(([e, n, ok]) => el('div', { class: 'badge' + (ok ? '' : ' off') }, el('span', { class: 'e' }, e), n)))));
+  body.append(el('h2', {}, 'Derniers rangements'), el('div', { class: 'card' }, recentList(list)));
+}
+function kpi(v, l) { return el('div', { class: 'kpi' }, el('div', { class: 'v' }, v), el('div', { class: 'l' }, l)); }
+function svg(w, h, inner) { const d = document.createElement('div'); d.innerHTML = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" role="img">${inner}</svg>`; return d.firstChild; }
+function barChart(list) {
+  const days = []; for (let i = 13; i >= 0; i--) { const d = addDays(new Date(), -i); days.push({ k: dayKey(d), d, v: 0 }); }
+  const m = Object.fromEntries(days.map(x => [x.k, x])); list.forEach(s => { const x = m[dayKey(s.start)]; if (x) x.v += sessionMinutes(s); });
+  const W = 340, H = 150, pad = 18, bw = (W - 10) / 14; const max = Math.max(5, ...days.map(x => x.v));
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted');
+  let g = '';
+  days.forEach((x, i) => { const h = (x.v / max) * (H - pad - 22); const X = 5 + i * bw;
+    g += `<rect x="${X + 3}" y="${H - pad - h}" width="${bw - 6}" height="${Math.max(h, x.v ? 2 : 0)}" rx="4" fill="${x.k === dayKey(new Date()) ? 'var(--accent2)' : 'var(--accent)'}"/>`;
+    if (x.v) g += `<text x="${X + bw / 2}" y="${H - pad - h - 4}" text-anchor="middle" font-size="9" fill="currentColor">${Math.round(x.v)}</text>`;
+    g += `<text x="${X + bw / 2}" y="${H - 5}" text-anchor="middle" font-size="9" fill="${muted}">${'DLMMJVS'[x.d.getDay()]}${x.d.getDate()}</text>`; });
+  g += `<line x1="5" x2="${W - 5}" y1="${H - pad}" y2="${H - pad}" stroke="var(--line)"/>`;
+  return svg(W, H, g);
+}
+function weekChart(list) {
+  const weeks = []; const now = new Date(); now.setHours(0, 0, 0, 0); const monday = addDays(now, -((now.getDay() + 6) % 7));
+  for (let i = 7; i >= 0; i--) weeks.push({ s: addDays(monday, -7 * i).getTime(), v: 0 });
+  list.forEach(s => { for (let i = weeks.length - 1; i >= 0; i--) if (s.start >= weeks[i].s) { weeks[i].v += sessionMinutes(s); break; } });
+  const W = 340, H = 140, pad = 18; const max = Math.max(10, ...weeks.map(w => w.v)); const step = (W - 30) / (weeks.length - 1);
+  const pts = weeks.map((w, i) => [15 + i * step, H - pad - (w.v / max) * (H - pad - 22)]);
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted');
+  let g = `<polyline fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round" points="${pts.map(p => p.join(',')).join(' ')}"/>`;
+  pts.forEach(([x, y], i) => { g += `<circle cx="${x}" cy="${y}" r="4" fill="var(--accent)"/>`; if (weeks[i].v) g += `<text x="${x}" y="${y - 8}" text-anchor="middle" font-size="9" fill="currentColor">${Math.round(weeks[i].v)}</text>`; const d = new Date(weeks[i].s); g += `<text x="${x}" y="${H - 4}" text-anchor="middle" font-size="9" fill="${muted}">${d.getDate()}/${d.getMonth() + 1}</text>`; });
+  return svg(W, H, g);
+}
+function heatmap(list) {
+  const v = {}; list.forEach(s => { const k = dayKey(s.start); v[k] = (v[k] || 0) + sessionMinutes(s); });
+  const today = new Date(); const monday = addDays(today, -((today.getDay() + 6) % 7)); const start = addDays(monday, -28);
+  const g = el('div', { class: 'heat' }); ['L', 'M', 'M', 'J', 'V', 'S', 'D'].forEach(d => g.append(el('div', { style: 'background:none' }, d)));
+  for (let i = 0; i < 35; i++) { const d = addDays(start, i); const k = dayKey(d); const m = v[k] || 0; const fut = d > today;
+    const a = m ? Math.min(1, .35 + m / 30) : 0;
+    g.append(el('div', { title: `${k} : ${Math.round(m)} min`, style: fut ? 'opacity:.3' : m ? `background:rgba(43,182,115,${a});color:#fff;font-weight:700` : (k === dayKey(today) ? 'outline:2px solid var(--accent)' : '') }, String(d.getDate()))); }
+  return g;
+}
+function perPerson() {
+  const rows = S.people.map(p => ({ p, m: sessionsFor(p.id).reduce((a, s) => a + sessionMinutes(s), 0) })); const max = Math.max(1, ...rows.map(r => r.m));
+  return el('div', {}, rows.map(r => el('div', { style: 'margin:8px 0' }, el('div', { class: 'row small' }, el('span', {}, `${r.p.emoji} ${r.p.name}`), el('span', { class: 'grow' }), el('b', {}, `${Math.round(r.m)} min`)), el('div', { class: 'bar' }, el('i', { style: `width:${r.m / max * 100}%;background:${r.p.color}` })))));
+}
+function perRoom(list) {
+  const m = {}; list.forEach(s => s.rooms.forEach(r => { const k = r.name; m[k] = m[k] || { e: r.emoji, n: r.name, t: 0, c: 0 }; if (r.status !== 'skipped') { m[k].t += r.spent; m[k].c++; } }));
+  const rows = Object.values(m).sort((a, b) => b.t - a.t); const max = Math.max(1, ...rows.map(r => r.t));
+  if (!rows.length) return el('p', { class: 'muted', style: 'margin:0' }, 'Pas encore de données.');
+  return el('div', {}, rows.map(r => el('div', { style: 'margin:8px 0' }, el('div', { class: 'row small' }, el('span', {}, `${r.e} ${r.n}`), el('span', { class: 'grow' }), el('span', { class: 'muted' }, `${r.c}× · `), el('b', {}, `${Math.round(r.t / 60)} min`)), el('div', { class: 'bar' }, el('i', { style: `width:${r.t / max * 100}%` })))));
+}
+function recentList(list) {
+  const items = [...list].sort((a, b) => b.start - a.start).slice(0, 15);
+  if (!items.length) return el('p', { class: 'muted', style: 'margin:0' }, 'Aucun rangement pour l\'instant. Lance le premier depuis l\'accueil !');
+  return el('ul', { class: 'roomlist' }, items.map(s => { const d = new Date(s.start);
+    const who = s.people.map(id => (S.people.find(p => p.id === id) || {}).emoji || '❔').join('');
+    const done = s.rooms.filter(r => r.status !== 'skipped').length;
+    return el('li', {}, el('div', { class: 'grow' }, el('b', {}, d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })),
+      el('div', { class: 'muted small' }, `${who} · ${done}/${s.rooms.length} pièces · ${Math.round(sessionMinutes(s))} min${s.stopped ? ' · arrêté' : ''}`)), el('b', {}, `+${sessionPoints(s)} ⭐`)); }));
+}
+
+/* ------------------------- SETTINGS ------------------------- */
+function renderSettings() {
+  $('#setDefault').value = S.settings.defaultMin; $('#setSound').value = S.settings.sound; $('#setVol').value = S.settings.volume;
+  $('#setVib').checked = S.settings.vibrate; $('#setTick').checked = S.settings.tick; $('#setTheme').value = S.settings.theme;
+  $('#version').textContent = 'TidyTime v' + VERSION + (navigator.serviceWorker && navigator.serviceWorker.controller ? ' · disponible hors ligne ✓' : '');
+}
+function applyTheme() { if (S.settings.theme) document.documentElement.dataset.theme = S.settings.theme; else delete document.documentElement.dataset.theme; }
+$('#setDefault').addEventListener('change', e => { S.settings.defaultMin = Math.max(1, Math.min(60, parseInt(e.target.value, 10) || 5)); save(); });
+$('#setSound').addEventListener('change', e => { S.settings.sound = e.target.value; save(); unlockAudio(); playOnce(); });
+$('#setVol').addEventListener('change', e => { S.settings.volume = parseFloat(e.target.value); save(); unlockAudio(); playOnce(); });
+$('#setVib').addEventListener('change', e => { S.settings.vibrate = e.target.checked; save(); });
+$('#setTick').addEventListener('change', e => { S.settings.tick = e.target.checked; save(); });
+$('#setTheme').addEventListener('change', e => { S.settings.theme = e.target.value; save(); applyTheme(); });
+$('#testSound').addEventListener('click', () => { unlockAudio(); playOnce(); if (S.settings.vibrate && navigator.vibrate) navigator.vibrate(300); });
+$('#exportBtn').addEventListener('click', () => {
+  const photos = {}; S.rooms.forEach(r => { const p = getPhoto(r.id); if (p) photos[r.id] = p; });
+  const blob = new Blob([JSON.stringify({ app: 'tidytime', version: VERSION, data: S, photos })], { type: 'application/json' });
+  const a = el('a', { href: URL.createObjectURL(blob), download: `tidytime-${dayKey(new Date())}.json` }); document.body.append(a); a.click(); a.remove();
+});
+$('#importFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const j = JSON.parse(await f.text()); if (!j.data || !Array.isArray(j.data.rooms)) throw 0; S = Object.assign(defaults(), j.data); S.settings = Object.assign(defaults().settings, j.data.settings || {}); Object.entries(j.photos || {}).forEach(([id, p]) => setPhoto(id, p)); save(); toast('Sauvegarde importée ✓'); applyTheme(); renderSettings(); }
+  catch (_) { toast('Fichier invalide'); }
+  e.target.value = '';
+});
+$('#resetStats').addEventListener('click', () => {
+  sheet($('#editModal'), $('#editBody'), [
+    el('h2', { style: 'margin-top:0' }, 'Effacer toutes les stats ?'),
+    el('p', { class: 'muted' }, 'Les pièces et les personnes sont gardées. Cette action est définitive.'),
+    el('div', { class: 'row' }, el('button', { class: 'btn grow', onclick: () => closeSheet($('#editModal')) }, 'Annuler'),
+      el('button', { class: 'btn grow', style: 'background:var(--warn);color:#fff', onclick: () => { S.sessions = []; save(); closeSheet($('#editModal')); toast('Stats effacées'); } }, 'Effacer')),
+  ]);
+});
+
+/* ------------------------- CONFETTI ------------------------- */
+function confetti() {
+  const c = $('#confetti'); const x = c.getContext('2d'); c.width = innerWidth; c.height = innerHeight;
+  const P = Array.from({ length: 140 }, () => ({ x: Math.random() * c.width, y: -20 - Math.random() * c.height * .5, vx: (Math.random() - .5) * 3, vy: 2 + Math.random() * 4, r: Math.random() * 6.28, vr: (Math.random() - .5) * .3, col: COLORS[Math.floor(Math.random() * COLORS.length)], s: 6 + Math.random() * 6 }));
+  const t0 = performance.now();
+  const f = t => { x.clearRect(0, 0, c.width, c.height); P.forEach(p => { p.x += p.vx; p.y += p.vy; p.r += p.vr; p.vy += .04; x.save(); x.translate(p.x, p.y); x.rotate(p.r); x.fillStyle = p.col; x.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); x.restore(); }); if (t - t0 < 3500) requestAnimationFrame(f); else x.clearRect(0, 0, c.width, c.height); };
+  requestAnimationFrame(f);
+}
+
+/* ------------------------- BOOT ------------------------- */
+load(); applyTheme(); go('home');
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+window.TT = { get state() { return S; }, get run() { return R; }, _fast(ms) { if (R && R.phase === 'running') R.roomStart -= (remainingMs() - ms); } };
+})();
+</script>
+</body>
+</html>
